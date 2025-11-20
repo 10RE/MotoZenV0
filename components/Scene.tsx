@@ -3,7 +3,6 @@ import { useBox, useCylinder, usePlane } from '@react-three/cannon';
 import { BikeController } from './BikeController';
 import { useGameStore } from '../store';
 import { useKeyboardControls } from '../hooks/useKeyboardControls';
-import { Vector3 } from 'three';
 
 const Terrain: React.FC = () => {
   // Ground
@@ -161,15 +160,11 @@ const Log: React.FC<{position: [number, number, number], rotation: [number, numb
 
 export const Scene: React.FC = () => {
   const controls = useKeyboardControls();
-  const bikePosition = useRef(new Vector3());
 
   return (
     <>
       <Terrain />
-      <BikeController 
-        controls={controls} 
-        onPositionUpdate={(pos) => bikePosition.current.copy(pos)}
-      />
+      <BikeController controls={controls} />
     </>
   );
 };

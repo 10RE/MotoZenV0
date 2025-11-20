@@ -20,10 +20,10 @@ interface GameState {
   isCustomizing: boolean;
   setCustomizing: (val: boolean) => void;
 
-  // Player Interaction
-  isRiding: boolean;
-  toggleMount: () => void;
+  // Player State
+  isMounted: boolean;
   canMount: boolean;
+  toggleMount: () => void;
   setCanMount: (val: boolean) => void;
 }
 
@@ -50,9 +50,8 @@ export const useGameStore = create<GameState>((set) => ({
   isCustomizing: false,
   setCustomizing: (val) => set({ isCustomizing: val }),
 
-  // Player Interaction Defaults
-  isRiding: true,
-  toggleMount: () => set((state) => ({ isRiding: !state.isRiding })),
+  isMounted: true,
   canMount: true,
+  toggleMount: () => set((state) => ({ isMounted: !state.isMounted })),
   setCanMount: (val) => set({ canMount: val }),
 }));

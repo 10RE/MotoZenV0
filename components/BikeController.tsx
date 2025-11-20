@@ -49,10 +49,9 @@ class SoundEngine {
 
 interface BikeProps {
   controls: ControlsState;
-  onPositionUpdate: (pos: THREE.Vector3) => void;
 }
 
-export const BikeController: React.FC<BikeProps> = ({ controls, onPositionUpdate }) => {
+export const BikeController: React.FC<BikeProps> = ({ controls }) => {
   const { camera } = useThree();
   const updateBikeData = useGameStore(s => s.updateBikeData);
   const bikeConfig = useGameStore(s => s.bikeConfig);
@@ -78,7 +77,7 @@ export const BikeController: React.FC<BikeProps> = ({ controls, onPositionUpdate
   
   useEffect(() => api.velocity.subscribe((v) => (velocity.current = v)), [api.velocity]);
 
-  // Initialize audio on first interaction (browser policy)
+  // Initialize audio on first interaction
   useEffect(() => {
     if ((controls.forward || controls.backward) && !audioStarted) {
         soundEngine.current.start();
@@ -96,15 +95,10 @@ export const BikeController: React.FC<BikeProps> = ({ controls, onPositionUpdate
     }
   }, [controls.reset, api]);
 
-  // Camera smoothing
-  const cameraOffset = useRef(new THREE.Vector3(0, 4, -8));
-  const cameraLookAt = useRef(new THREE.Vector3(0, 0, 0));
-
   useFrame((state, delta) => {
     if (!sphereRef.current) return;
 
     const pos = sphereRef.current.position;
-    onPositionUpdate(pos);
     
     const velVector = new THREE.Vector3(velocity.current[0], velocity.current[1], velocity.current[2]);
     const speedMs = Math.sqrt(velVector.x**2 + velVector.z**2); 
@@ -123,14 +117,13 @@ export const BikeController: React.FC<BikeProps> = ({ controls, onPositionUpdate
     }
 
     // Automatic Transmission Logic
-    // Simple shift points based on speed
     if (speedKmh < 30) engine.current.gear = 1;
     else if (speedKmh < 60) engine.current.gear = 2;
     else if (speedKmh < 90) engine.current.gear = 3;
     else if (speedKmh < 120) engine.current.gear = 4;
     else engine.current.gear = 5;
 
-    // RPM Logic (Simulated based on gear range)
+    // RPM Logic
     const gearMinSpeeds = [0, 0, 30, 60, 90, 120];
     const gearMaxSpeeds = [0, 40, 70, 100, 130, 200];
     const currentMin = gearMinSpeeds[engine.current.gear];
@@ -140,21 +133,18 @@ export const BikeController: React.FC<BikeProps> = ({ controls, onPositionUpdate
     
     let targetRpm = IDLE_RPM + (ratio * (REDLINE_RPM - IDLE_RPM));
     if (controls.forward && engine.current.gear === 1 && speedKmh < 10) {
-         // Rev up higher when starting
          targetRpm = Math.max(targetRpm, 3000); 
     }
-    
     engine.current.rpm = THREE.MathUtils.lerp(engine.current.rpm, Math.max(IDLE_RPM, targetRpm), delta * 5);
 
     // Movement Logic
     const throttle = controls.forward ? 1 : 0;
-    const brake = controls.backward ? 1 : 0; // S acts as brake/reverse
+    const brake = controls.backward ? 1 : 0; 
     const handbrake = controls.brake ? 1 : 0;
 
     // Steering
     if (speedKmh > 0.5) {
         const steerAmt = controls.left ? 1 : controls.right ? -1 : 0;
-        // Steering becomes less sensitive at high speed
         const sensitivity = Math.max(0.5, 2.5 - (speedKmh / 80));
         heading.current += steerAmt * delta * sensitivity;
     }
@@ -163,68 +153,54 @@ export const BikeController: React.FC<BikeProps> = ({ controls, onPositionUpdate
     const forwardDir = new THREE.Vector3(Math.sin(heading.current), 0, Math.cos(heading.current));
     let force = 0;
 
-    // Suspension config
     const powerMult = bikeConfig.suspension === 'stiff' ? 1.1 : 1.0;
 
     if (throttle && speedKmh < TOP_SPEED) {
         force = 1200 * powerMult * effectiveTraction;
-        // Reduce power in high gears roughly
         force -= (engine.current.gear * 50); 
     }
 
-    // Braking (S key)
     if (brake) {
         if (speedKmh > 1) {
-            force = -BRAKE_FORCE * 50; // Brakes
+            force = -BRAKE_FORCE * 50;
         } else {
-            force = -300; // Reverse slowly
+            force = -300; 
         }
     }
 
-    // Handbrake (Space)
     if (handbrake) {
         force = 0;
         api.velocity.set(velocity.current[0] * 0.9, velocity.current[1], velocity.current[2] * 0.9);
     }
 
-    // Apply Drag
     if (effectiveDrag > 0) {
         force -= speedMs * 300 * effectiveDrag;
     }
     
-    // Apply Air Resistance
     force -= speedKmh * 2; 
 
     const forceVec = forwardDir.clone().multiplyScalar(force);
     api.applyForce([forceVec.x, 0, forceVec.z], [0,0,0]);
 
     // Sync Visual Rotation
-    sphereRef.current.rotation.set(0, heading.current, 0);
+    if (sphereRef.current) {
+        sphereRef.current.rotation.set(0, heading.current, 0);
+    }
 
+    // --- RIGID ATTACHED CAMERA LOGIC ---
+    const offsetDist = 7;
+    const offsetHeight = 3.5;
 
-    // --- CHASE CAMERA LOGIC ---
-    // Ideally, we want the camera:
-    // 1. Behind the bike
-    // 2. Slightly above
-    // 3. Following rotation gently
-    
-    const desiredDist = 8;
-    const desiredHeight = 3.5;
+    // Calculate camera position behind the bike based on heading
+    const camX = pos.x - Math.sin(heading.current) * offsetDist;
+    const camZ = pos.z - Math.cos(heading.current) * offsetDist;
+    const camY = pos.y + offsetHeight;
 
-    // Calculate position behind bike based on current heading
-    const offset = new THREE.Vector3(0, desiredHeight, -desiredDist);
-    offset.applyAxisAngle(new THREE.Vector3(0,1,0), heading.current);
+    // Set position directly (no lerp) to ensure it's attached
+    camera.position.set(camX, camY, camZ);
     
-    const targetPos = pos.clone().add(offset);
-    
-    // Lerp camera position for smoothness
-    // We use a higher lerp value so it doesn't lag too much during turns
-    camera.position.lerp(targetPos, delta * 5);
-    
-    // Look slightly above the bike center to keep it in lower third of screen
-    const lookTarget = pos.clone().add(new THREE.Vector3(0, 2, 0));
-    cameraLookAt.current.lerp(lookTarget, delta * 10);
-    camera.lookAt(cameraLookAt.current);
+    // Look at the bike (with a slight vertical offset to keep bike in lower frame)
+    camera.lookAt(pos.x, pos.y + 1.5, pos.z);
 
     // Update Store
     updateBikeData({

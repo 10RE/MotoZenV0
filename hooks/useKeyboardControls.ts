@@ -16,16 +16,16 @@ export const useKeyboardControls = (): ControlsState => {
   const handleKey = useCallback((e: any, isPressed: boolean) => {
     const key = e.code;
     switch (key) {
-      case 'KeyW': setInput(s => ({ ...s, forward: isPressed })); break;
-      case 'KeyS': setInput(s => ({ ...s, backward: isPressed })); break;
-      case 'KeyA': setInput(s => ({ ...s, left: isPressed })); break;
-      case 'KeyD': setInput(s => ({ ...s, right: isPressed })); break;
+      case 'KeyY': setInput(s => ({ ...s, forward: isPressed })); break;
+      case 'KeyH': setInput(s => ({ ...s, backward: isPressed })); break;
+      case 'KeyG': setInput(s => ({ ...s, left: isPressed })); break;
+      case 'KeyJ': setInput(s => ({ ...s, right: isPressed })); break;
       case 'Space': setInput(s => ({ ...s, brake: isPressed })); break;
+      case 'KeyK': setInput(s => ({ ...s, interact: isPressed })); break;
       case 'KeyR':
         if (isPressed) setInput(s => ({ ...s, reset: true }));
         else setInput(s => ({ ...s, reset: false }));
         break;
-      case 'KeyF': setInput(s => ({ ...s, interact: isPressed })); break;
     }
   }, []);
 
